@@ -110,11 +110,11 @@ type PnlDisplay = { kind: "value"; value: number } | { kind: "text"; text: strin
 
 function ArenaCameraRow({ leftCamera, rightCamera }: { leftCamera: ReactNode; rightCamera: ReactNode }) {
   return (
-    <div className="relative grid w-full grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
+    <div className="relative grid w-full grid-cols-2 gap-3 sm:gap-8 lg:gap-10">
       <div className="mx-auto w-full max-w-[560px]">{leftCamera}</div>
       <div className="mx-auto w-full max-w-[560px]">{rightCamera}</div>
-      <div className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-background text-sm font-extrabold tracking-widest text-muted shadow-lg">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-border bg-background text-[10px] font-extrabold tracking-widest text-muted shadow-lg sm:h-14 sm:w-14 sm:text-sm">
           VS
         </span>
       </div>

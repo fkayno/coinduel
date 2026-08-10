@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { logoutAction } from "@/lib/auth/actions";
 import { hasProAccess } from "@/lib/billing/entitlement";
 import { ProBadge } from "@/components/ui/pro-badge";
+import { MobileNav } from "@/components/mobile-nav";
 
 const LOGGED_OUT_LINKS = [
   { href: "/#duel", label: "Play" },
@@ -26,7 +27,7 @@ export async function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <nav className="relative mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center gap-2.5">
           <Image src="/logo.png" alt="CoinDuel" width={28} height={28} priority />
           <span className="text-base font-semibold tracking-tight text-foreground">
@@ -47,6 +48,11 @@ export async function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <MobileNav
+            navLinks={navLinks}
+            user={user ? { username: user.username } : null}
+            isPro={isPro}
+          />
           {user ? (
             <>
               {isPro ? (
