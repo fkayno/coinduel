@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/db/client";
 import type { Tournament as TournamentRow } from "@/generated/prisma/client";
+import type { GameMode } from "@/lib/game/game-modes";
 
 export interface StoredTournament {
   id: string;
   name: string;
   description: string | null;
   status: string; // "UPCOMING" | "LIVE" | "COMPLETED"
-  startsAt: string;
+  startsAt: string | null;
+  gameMode: GameMode | null;
+  prizeDescription: string | null;
+  signupsEnabled: boolean;
   participantCount: number;
 }
 
@@ -16,7 +20,10 @@ function mapTournament(row: TournamentRow & { _count: { participants: number } }
     name: row.name,
     description: row.description,
     status: row.status,
-    startsAt: row.startsAt.toISOString(),
+    startsAt: row.startsAt?.toISOString() ?? null,
+    gameMode: (row.gameMode as GameMode | null) ?? null,
+    prizeDescription: row.prizeDescription,
+    signupsEnabled: row.signupsEnabled,
     participantCount: row._count.participants,
   };
 }

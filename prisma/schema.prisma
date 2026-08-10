@@ -309,7 +309,21 @@ model Tournament {
   description String?
   // "UPCOMING" | "LIVE" | "COMPLETED"
   status      String
-  startsAt    DateTime
+  // Nullable — a freshly-announced tournament can exist before an exact
+  // date is set ("date TBA" in the UI); loosened from the original
+  // required column, existing rows are unaffected.
+  startsAt    DateTime?
+  // Which ranked game mode (see src/lib/game/game-modes.ts) this
+  // tournament's matches will be played on, shown as a badge. Null means
+  // not yet decided / not applicable.
+  gameMode         String?
+  // Free-text prize display, e.g. "1 SOL" — deliberately just a display
+  // string, not a payout system (see spec: no wagers/payouts implemented).
+  prizeDescription String?
+  // False for an announcement-only tournament with no registration flow
+  // yet (e.g. still being finalized) — the UI shows a "MORE INFORMATION"
+  // link instead of a JOIN button, regardless of login/Pro status.
+  signupsEnabled   Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

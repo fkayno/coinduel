@@ -25,6 +25,12 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/tournament
   if (tournament.status === "COMPLETED") {
     return NextResponse.json({ error: "This tournament has already ended." }, { status: 410 });
   }
+  // Announcement-only tournaments (see Tournament.signupsEnabled) have no
+  // registration flow yet — enforced here, not just by hiding the JOIN
+  // button, since this route could otherwise be hit directly.
+  if (!tournament.signupsEnabled) {
+    return NextResponse.json({ error: "Registration for this tournament isn't open yet." }, { status: 403 });
+  }
 
   await registerParticipant(id, user.id);
   return NextResponse.json({ ok: true });

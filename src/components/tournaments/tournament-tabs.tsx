@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/format";
 import type { StoredTournament } from "@/lib/db/tournaments";
+import { GAME_MODE_META } from "@/lib/game/game-modes";
+import { DISCORD_INVITE_URL } from "@/lib/config";
 
 type Tab = "UPCOMING" | "LIVE" | "COMPLETED";
 const TABS: Tab[] = ["UPCOMING", "LIVE", "COMPLETED"];
@@ -35,6 +37,22 @@ function JoinControl({
 
   if (tournament.status === "COMPLETED") {
     return <span className="text-xs font-semibold text-muted">ENDED</span>;
+  }
+
+  // Announcement-only — no registration flow exists yet for this
+  // tournament. Takes priority over the login/Pro/registered checks below
+  // since there's nothing to log in or upgrade for.
+  if (!tournament.signupsEnabled) {
+    return (
+      <a
+        href={DISCORD_INVITE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-md border border-border px-4 py-2 text-xs font-bold tracking-wide text-foreground transition-colors duration-150 hover:border-muted"
+      >
+        MORE INFORMATION
+      </a>
+    );
   }
 
   if (registered) {
@@ -143,9 +161,25 @@ export function TournamentTabs({ tournaments, isLoggedIn, isPro, registeredIds }
                 {tournament.description && (
                   <p className="mt-1 max-w-md text-sm text-muted">{tournament.description}</p>
                 )}
+                {(tournament.gameMode || tournament.prizeDescription) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {tournament.gameMode && (
+                      <span className="rounded-full border border-border px-2.5 py-1 text-[10px] font-bold tracking-wide text-muted">
+                        {GAME_MODE_META[tournament.gameMode].label}
+                      </span>
+                    )}
+                    {tournament.prizeDescription && (
+                      <span className="rounded-full border border-accent/40 bg-accent/10 px-2.5 py-1 text-[10px] font-bold tracking-wide text-accent">
+                        PRIZE: {tournament.prizeDescription}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="mt-2 text-xs text-muted">
-                  {tournament.status === "UPCOMING" ? "Starts " : ""}
-                  {formatDate(tournament.startsAt)} &middot; {tournament.participantCount} registered
+                  {tournament.startsAt
+                    ? `${tournament.status === "UPCOMING" ? "Starts " : ""}${formatDate(tournament.startsAt)}`
+                    : "Date TBA"}
+                  {tournament.signupsEnabled && ` · ${tournament.participantCount} registered`}
                 </p>
               </div>
 
