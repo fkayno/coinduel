@@ -49,3 +49,6 @@ next-env.d.ts
 # local-machine Claude Code settings, not shared project config
 .claude/settings.local.json
 .stripe-listen.log
+
+.vercel
+.env*
