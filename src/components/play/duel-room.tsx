@@ -130,7 +130,7 @@ function ArenaIdentityRow({
   right: { label: string; player: MatchPlayerRecord; pnl: PnlDisplay; isPro: boolean };
 }) {
   return (
-    <div className="grid w-full grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
+    <div className="grid w-full grid-cols-2 gap-3 sm:gap-8 lg:gap-10">
       <ArenaIdentityBlock {...left} />
       <ArenaIdentityBlock {...right} />
     </div>
@@ -149,20 +149,29 @@ function ArenaIdentityBlock({
   isPro: boolean;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-1 text-center">
-      <span className="text-xs font-semibold tracking-[0.2em] text-muted">{label}</span>
-      <Avatar username={player.username} profileImageUrl={player.profileImageUrl} size="md" />
-      <span className="flex items-center gap-1.5 text-lg font-bold text-foreground">
-        @{player.username}
+    <div className="mx-auto flex w-full max-w-[560px] min-w-0 flex-col items-center gap-1 text-center">
+      <span className="text-[10px] font-semibold tracking-[0.2em] text-muted sm:text-xs">
+        {label}
+      </span>
+      <Avatar
+        username={player.username}
+        profileImageUrl={player.profileImageUrl}
+        size="sm"
+        className="sm:h-10 sm:w-10 sm:text-sm"
+      />
+      <span className="flex max-w-full items-center gap-1.5 truncate text-sm font-bold text-foreground sm:text-lg">
+        <span className="truncate">@{player.username}</span>
         {isPro && <ProBadge />}
       </span>
-      <div className="mt-1 flex items-center gap-2">
-        <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/90">
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+        <span className="rounded-full border border-border px-2 py-0.5 text-[9px] font-semibold text-foreground/90 sm:px-2.5 sm:py-1 sm:text-[11px]">
           {getRankForMmr(player.mmrBefore)}
         </span>
-        <span className="text-xs text-muted">{player.mmrBefore.toLocaleString()} MMR</span>
+        <span className="text-[10px] text-muted sm:text-xs">
+          {player.mmrBefore.toLocaleString()} MMR
+        </span>
       </div>
-      <span className="mt-3 text-[10px] font-semibold tracking-[0.25em] text-muted">
+      <span className="mt-2 text-[8px] font-semibold tracking-[0.2em] text-muted sm:mt-3 sm:text-[10px] sm:tracking-[0.25em]">
         ALL-TIME PNL
       </span>
       {pnl.kind === "value" ? (
@@ -170,11 +179,11 @@ function ArenaIdentityBlock({
           value={pnl.value}
           prefix="$"
           jitter={false}
-          className={`text-3xl font-extrabold ${pnl.value >= 0 ? "text-accent" : "text-loss"}`}
+          className={`text-lg font-extrabold sm:text-3xl ${pnl.value >= 0 ? "text-accent" : "text-loss"}`}
         />
       ) : (
         <span
-          className={`text-sm font-bold tracking-wide ${pnl.tone === "loss" ? "text-loss" : "text-muted"}`}
+          className={`text-xs font-bold tracking-wide sm:text-sm ${pnl.tone === "loss" ? "text-loss" : "text-muted"}`}
         >
           {pnl.text}
         </span>
