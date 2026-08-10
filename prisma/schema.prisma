@@ -1,0 +1,324 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// PRODUCTION SOURCE OF TRUTH. As of the Postgres migration, every one of
+// these models is read/written exclusively through src/lib/db/ — nothing in
+// the app depends on the old .data/*.json files anymore. See
+// src/lib/db/README.md for the repository layer that wraps these models.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Mirrors the shape of the old src/lib/auth/dev-store.ts's StoredUser type
+// (now src/lib/db/users.ts). `id` is uuid(), NOT Prisma's cuid() default —
+// kept for id-format stability even though avatars are no longer served
+// through a Next.js route (see profileImageUrl below).
+model User {
+  id             String   @id @default(uuid())
+  username       String   @unique
+  email          String   @unique
+  passwordHash   String
+  // @unique: one verified wallet can only ever belong to one account —
+  // Postgres unique constraints allow any number of NULLs, so unverified
+  // users (walletAddress still null) are unaffected. Prevents two accounts
+  // both claiming the same wallet's trading history for ranked competition.
+  walletAddress  String? @unique
+  // True only after a signature proving control of walletAddress has been
+  // cryptographically verified — see src/lib/wallet/verify.ts. Required for
+  // ranked matchmaking.
+  walletVerified Boolean  @default(false)
+  // Set the moment verifyUserWallet() succeeds; cleared alongside
+  // walletAddress/walletVerified on disconnect. Null means never verified.
+  walletVerifiedAt DateTime?
+  // Direct public Supabase Storage URL (see
+  // src/lib/storage/supabase-avatar-storage.ts) — the image bytes live in
+  // the "avatars" Storage bucket, not in Postgres.
+  profileImageUrl String?
+  mmr            Int      @default(1000)
+  wins           Int      @default(0)
+  losses         Int      @default(0)
+  streak         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  matchPlayers MatchPlayer[]
+  queueEntry   QueueEntry?
+  subscription Subscription?
+  hostedPrivateRooms      PrivateRoom[]
+  tournamentParticipants  TournamentParticipant[]
+
+  // Supports a future MMR-sorted leaderboard query — the leaderboard UI is
+  // currently mock data (pre-existing, out of scope of this migration), but
+  // this is the obvious first real query once it's wired up.
+  @@index([mmr])
+}
+
+// Mirrors src/lib/wallet/challenge-store.ts's WalletChallenge type — a
+// short-lived, single-use nonce a user signs to prove wallet ownership.
+// One pending challenge per user (userId is the primary key, not a separate
+// id); deleted the moment it's checked in /api/wallet/verify (success OR
+// failure) so it can never be replayed — see src/lib/db/wallet-challenges.ts.
+model WalletChallenge {
+  userId        String   @id
+  walletAddress String
+  nonce         String
+  message       String
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+}
+
+// Mirrors src/lib/game/store.ts's StoredMatch type (types now live there
+// still, runtime moved to src/lib/db/matches.ts). Once status is
+// "COMPLETED", application code never mutates a match's outcome fields
+// again (see finalizeMatch()/forfeitMatch() in match-service.ts, unchanged
+// by this migration) — that idempotency guard is what keeps completed
+// matches immutable, not a DB-level constraint.
+model Match {
+  id          String    @id @default(uuid())
+  status      String // "FOUND" | "ACTIVE" | "COMPLETED"
+  duration    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  endedAt     DateTime?
+  // Plain strings, not @relation — deliberately unconstrained so a bot
+  // opponent's synthetic id ("bot:GHOSTWICK") is always valid here, and so
+  // this stays populated even if a real winner's/loser's User row is later
+  // deleted (match history must survive account deletion).
+  winnerId    String?
+  loserId     String?
+  pnlStatus   String    @default("PENDING") // "PENDING" | "READY" | "FAILED" — see match-service.ts
+  pnlError    String?
+  // Set to the leaving player's userId when the match ended via forfeit
+  // (the LEAVE MATCH button, or a tab close) rather than the clock running out.
+  forfeitedBy String?
+  // false for a CoinDuel Pro private duel (src/lib/game/private-duel-service.ts).
+  // Immutable after creation — applyMatchResult() in match-service.ts checks
+  // this to skip Elo/MMR calculation and updateUserStats() entirely for
+  // private duels, per the product requirement that they never affect
+  // ranked MMR. Everything else (live cameras, 30s clock, real wallet PNL,
+  // PNL comparison, match history) is identical either way.
+  isRanked Boolean @default(true)
+
+  players MatchPlayer[]
+  videoSignals   VideoSignal[]
+  videoPresence  VideoPresence[]
+
+  // findActiveMatchForUser/listMatchesForUser both filter on status.
+  @@index([status])
+  // listMatchesForUser orders completed matches by endedAt DESC.
+  @@index([endedAt])
+}
+
+model MatchPlayer {
+  id      String @id @default(uuid())
+  matchId String
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  // 0 or 1 — this player's position in the app-level [MatchPlayerRecord,
+  // MatchPlayerRecord] tuple. Internal to the DB layer only; the rest of
+  // the app never sees this field, it's implied by array order.
+  playerIndex Int
+
+  // NULL for bot opponents (never a real row) — see isBot below. A bot's
+  // app-level userId ("bot:<username>") is reconstructed at read time from
+  // isBot + username, never stored as a literal FK value, since it isn't a
+  // real User.id and would violate the foreign key.
+  userId String?
+  // onDelete: SetNull (not Cascade) — deleting a User must NEVER delete
+  // their match history. Historical rows survive with userId cleared;
+  // username/walletAddress/profileImageUrl below are already point-in-time
+  // snapshots independent of the live User row either way.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  username String
+  // Snapshotted at match-creation time, like username — not a live link.
+  walletAddress   String?
+  profileImageUrl String?
+  isBot       Boolean @default(false)
+  mmrBefore   Int
+  mmrAfter    Int?
+  pnlSeed     Int
+  // PNL is FIXED for the whole match — fetched once from Solana Tracker's
+  // wallet "Total PnL" when the match starts, and frozen. startingPnl and
+  // endingPnl are always equal by design; pnlChange is always 0 and kept
+  // only for shape compatibility with the pre-migration data.
+  startingPnl Float?
+  endingPnl   Float?
+  pnlChange   Float?
+  result      String? // "WIN" | "LOSS"
+  // Decorative only — the player's most profitable memecoin (see
+  // src/lib/game/top-token-service.ts). Never affects match outcome.
+  topTokenSymbol     String?
+  topTokenName       String?
+  topTokenImageUrl   String?
+  topTokenPnl        Float?
+  topTokenPnlPercent Float?
+
+  @@unique([matchId, playerIndex])
+  @@index([matchId])
+  @@index([userId])
+}
+
+// Did not exist before this migration — the matchmaking queue was
+// file-based only (.data/dev-queue.json), explicitly called out as needing
+// a real table for production. userId is the PRIMARY KEY, not a separate
+// autoincrement id: that alone is what guarantees "at most one queue entry
+// per user" as a hard DB constraint (addToQueue becomes an upsert), which
+// is half of preventing a user from ending up in two matches at once — see
+// src/lib/db/matches.ts for the other half (advisory-lock-guarded
+// transactional matching).
+model QueueEntry {
+  userId   String   @id
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  username String
+  mmr      Int
+  joinedAt DateTime @default(now())
+}
+
+// CoinDuel Pro subscription state — the ONLY source of truth for PRO
+// entitlement (see src/lib/billing/entitlement.ts's hasProAccess()). Never
+// written from client input; every field here is set exclusively from
+// trusted Stripe webhook events (src/app/api/stripe/webhook/route.ts) or
+// server-side Stripe API responses immediately after creating a resource.
+// `userId` is unique (not a separate composite constraint) — that alone is
+// the DB-level guarantee that one user can never end up with two active
+// CoinDuel subscription rows; a resubscribe after cancellation updates the
+// same row rather than inserting a second one.
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Created the moment a user first starts checkout, even before they pay —
+  // lets us reuse one Stripe Customer across repeat checkout attempts
+  // instead of creating a new one every time.
+  stripeCustomerId     String  @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId        String?
+
+  // Mirrors Stripe's own subscription.status verbatim ("active", "past_due",
+  // "canceled", "unpaid", "incomplete", "incomplete_expired", "paused") —
+  // never a CoinDuel-invented value. hasProAccess() treats only "active" as
+  // PRO; every other status (including "past_due"/"unpaid" after a failed
+  // payment) means PRO features are removed, per spec.
+  status String
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  // True once the user has clicked "cancel" in the Customer Portal — Stripe
+  // keeps status "active" (and this row's PRO access) until currentPeriodEnd
+  // is actually reached, at which point Stripe fires
+  // customer.subscription.deleted and status flips to "canceled".
+  cancelAtPeriodEnd Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Idempotency ledger for Stripe webhook processing (src/app/api/stripe/webhook/route.ts).
+// `id` is the Stripe Event id itself (e.g. "evt_...") — inserting it is the
+// idempotency check: a duplicate delivery of the same event hits a unique
+// violation on insert and is skipped before any subscription state changes,
+// so Stripe's at-least-once retry behavior can never double-apply or
+// corrupt a subscription update.
+model StripeEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
+}
+
+// A PRO-only short-code 1v1 room (spec section 7). Deliberately thin: once
+// a second player joins, the actual duel is created through the SAME
+// createMatch()/matches.ts infrastructure ranked matches use (live cameras,
+// 30s clock, real wallet PNL) — this table only tracks the invite/handshake
+// before that match exists, never a parallel match implementation.
+model PrivateRoom {
+  id         String   @id @default(uuid())
+  // Short human-typeable code, e.g. "CD-7X4K9" — indexed via the unique
+  // constraint, which is also what guarantees no two rooms can collide.
+  code       String   @unique
+  hostUserId String
+  hostUser   User     @relation(fields: [hostUserId], references: [id], onDelete: Cascade)
+  // "WAITING" | "MATCHED" | "EXPIRED" | "CANCELLED"
+  status     String   @default("WAITING")
+  // Set once a second player joins and the real Match is created. Unique so
+  // a room can never be double-consumed into two different matches.
+  matchId    String?  @unique
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([status])
+}
+
+// Tournament infrastructure per spec section 10 — intentionally minimal
+// (no bracket/wager mechanics yet, per the spec: "build the infrastructure
+// and UI without implementing paid-entry tournaments or wagers"). Joining a
+// tournament is PRO-gated but does not yet create any matches.
+model Tournament {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  // "UPCOMING" | "LIVE" | "COMPLETED"
+  status      String
+  startsAt    DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants TournamentParticipant[]
+
+  @@index([status])
+}
+
+model TournamentParticipant {
+  id           String     @id @default(uuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt     DateTime   @default(now())
+
+  // A user can only register for a given tournament once.
+  @@unique([tournamentId, userId])
+  @@index([userId])
+}
+
+// WebRTC signaling (SDP offers/answers, ICE candidates) for a live match's
+// peer-to-peer video/audio. Replaces the old file-based src/lib/video/store.ts
+// (.data/signals/*.json), which only worked on a single long-lived process —
+// unsafe on serverless, where two requests for the same match can land on
+// different instances with no shared filesystem. `id` doubles as the
+// monotonic sequence number the client polls with (?since=<id>): a global
+// autoincrement is still strictly increasing within any matchId subset, so
+// no separate per-match counter/transaction is needed.
+model VideoSignal {
+  id         Int      @id @default(autoincrement())
+  matchId    String
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  fromUserId String
+  type       String // "offer" | "answer" | "ice-candidate" | "leave"
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([matchId, id])
+}
+
+// Heartbeat-based presence for a live match's video connection-status UI
+// only — never the match's PNL/MMR outcome, which stays purely
+// server-timestamp-driven in src/lib/game/match-service.ts. One row per
+// (match, user); a heartbeat is an upsert on that pair.
+model VideoPresence {
+  matchId    String
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId     String
+  lastSeenAt DateTime
+
+  @@id([matchId, userId])
+}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "coinduel-dev",
+      "runtimeExecutable": "C:\\CoinDuel\\.claude\\dev-server.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}
