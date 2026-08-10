@@ -2,13 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { GameModeModal } from "@/components/play/game-mode-modal";
+import { GAME_MODE_META, DEFAULT_GAME_MODE, type GameMode } from "@/lib/game/game-modes";
 
-interface PlayHubProps {
+interface ModeStats {
   mmr: number;
   wins: number;
   losses: number;
   streak: number;
+}
+
+interface PlayHubProps {
   rank: string;
+  statsByMode: Record<GameMode, ModeStats>;
 }
 
 type ViewState = "idle" | "searching";
@@ -22,9 +28,11 @@ function StatTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
+export function PlayHub({ rank, statsByMode }: PlayHubProps) {
   const router = useRouter();
   const [view, setView] = useState<ViewState>("idle");
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_GAME_MODE);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const [rangeMmr, setRangeMmr] = useState(100);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +50,7 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
       if (data.state === "match") {
         router.push(`/play/match/${data.matchId}`);
       } else if (data.state === "queued") {
+        setGameMode(data.gameMode ?? DEFAULT_GAME_MODE);
         setView("searching");
         setWaitingSeconds(data.waitingSeconds);
         setRangeMmr(data.rangeMmr);
@@ -76,13 +85,17 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
     };
   }, [view, router]);
 
-  async function handleFindMatch() {
+  async function handleConfirmMode(mode: GameMode) {
     if (isFinding) return; // guards against double-clicks while a request is in flight
     setError(null);
     setIsFinding(true);
 
     try {
-      const res = await fetch("/api/play/queue", { method: "POST" });
+      const res = await fetch("/api/play/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameMode: mode }),
+      });
       const data = await res.json().catch(() => null);
 
       if (res.status === 409 && data?.matchId) {
@@ -91,9 +104,12 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
       }
       if (!res.ok) {
         setError(typeof data?.error === "string" ? data.error : "Couldn't join the queue. Try again.");
+        setShowModeModal(false);
         return;
       }
 
+      setGameMode(mode);
+      setShowModeModal(false);
       setView("searching");
       setWaitingSeconds(0);
       setRangeMmr(100);
@@ -102,6 +118,7 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
       // rejection would go unhandled and the button would look "dead" with
       // no feedback at all.
       setError("Couldn't reach the server. Check your connection and try again.");
+      setShowModeModal(false);
     } finally {
       setIsFinding(false);
     }
@@ -112,15 +129,17 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
     setView("idle");
   }
 
-  const totalGames = wins + losses;
-  const winRatePct = totalGames === 0 ? 0 : Math.round((wins / totalGames) * 100);
-  const streakLabel = streak === 0 ? "—" : streak > 0 ? `${streak}W` : `${Math.abs(streak)}L`;
+  const activeStats = statsByMode[gameMode];
+  const totalGames = activeStats.wins + activeStats.losses;
+  const winRatePct = totalGames === 0 ? 0 : Math.round((activeStats.wins / totalGames) * 100);
+  const streakLabel =
+    activeStats.streak === 0 ? "—" : activeStats.streak > 0 ? `${activeStats.streak}W` : `${Math.abs(activeStats.streak)}L`;
 
   if (view === "searching") {
     return (
       <div className="flex flex-col items-center gap-8 rounded-2xl border border-border bg-surface p-10 text-center">
         <span className="text-xs font-semibold tracking-[0.3em] text-muted">
-          SEARCHING FOR OPPONENT
+          SEARCHING FOR OPPONENT &middot; {GAME_MODE_META[gameMode].label}
         </span>
 
         <div className="flex gap-10">
@@ -130,7 +149,7 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
           </div>
           <div>
             <p className="text-xs font-semibold tracking-widest text-muted">YOUR MMR</p>
-            <p className="mt-1 text-lg font-bold text-foreground">{mmr.toLocaleString()}</p>
+            <p className="mt-1 text-lg font-bold text-foreground">{activeStats.mmr.toLocaleString()}</p>
           </div>
         </div>
 
@@ -180,10 +199,10 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
 
       <div className="grid w-full grid-cols-3 gap-3 sm:grid-cols-6">
         <StatTile label="RANK" value={rank} />
-        <StatTile label="MMR" value={mmr.toLocaleString()} />
+        <StatTile label="MMR" value={activeStats.mmr.toLocaleString()} />
         <StatTile label="WIN RATE" value={`${winRatePct}%`} />
-        <StatTile label="WINS" value={String(wins)} />
-        <StatTile label="LOSSES" value={String(losses)} />
+        <StatTile label="WINS" value={String(activeStats.wins)} />
+        <StatTile label="LOSSES" value={String(activeStats.losses)} />
         <StatTile label="STREAK" value={streakLabel} />
       </div>
 
@@ -191,11 +210,11 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
 
       <button
         type="button"
-        onClick={handleFindMatch}
+        onClick={() => setShowModeModal(true)}
         disabled={isFinding}
         className="rounded-md bg-accent px-10 py-4 text-base font-bold tracking-wide text-black transition-all duration-150 hover:bg-accent-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isFinding ? "JOINING..." : "FIND MATCH"}
+        FIND MATCH
       </button>
 
       <div className="flex flex-col items-center gap-2">
@@ -204,6 +223,19 @@ export function PlayHub({ mmr, wins, losses, streak, rank }: PlayHubProps) {
           Your trading PNL is compared against your opponent&apos;s during the duel.
         </p>
       </div>
+
+      {showModeModal && (
+        <GameModeModal
+          mmrByMode={{
+            ALL_TIME: statsByMode.ALL_TIME.mmr,
+            THIRTY_DAYS: statsByMode.THIRTY_DAYS.mmr,
+            SEVEN_DAYS: statsByMode.SEVEN_DAYS.mmr,
+            ONE_DAY: statsByMode.ONE_DAY.mmr,
+          }}
+          onConfirm={handleConfirmMode}
+          onClose={() => setShowModeModal(false)}
+        />
+      )}
     </div>
   );
 }

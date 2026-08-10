@@ -6,6 +6,7 @@ import { fixedPnlOf, formatPnl, formatRelativeTime } from "@/lib/format";
 import { Avatar } from "@/components/ui/avatar";
 import { ProBadge } from "@/components/ui/pro-badge";
 import { getProStatusMap } from "@/lib/billing/entitlement";
+import { GAME_MODE_META } from "@/lib/game/game-modes";
 
 export const metadata: Metadata = {
   title: "Matches — CoinDuel",
@@ -57,6 +58,11 @@ export default async function MatchesPage() {
                   {!match.isRanked && (
                     <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted">
                       PRIVATE
+                    </span>
+                  )}
+                  {match.isRanked && (
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted">
+                      {GAME_MODE_META[match.gameMode].label}
                     </span>
                   )}
                   <span className="inline-flex items-center gap-2 text-sm text-muted">

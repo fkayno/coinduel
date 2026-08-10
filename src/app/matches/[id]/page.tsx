@@ -10,6 +10,7 @@ import { fixedPnlOf, formatPnl, formatRelativeTime } from "@/lib/format";
 import { Avatar } from "@/components/ui/avatar";
 import { ProBadge } from "@/components/ui/pro-badge";
 import { getProStatusMap } from "@/lib/billing/entitlement";
+import { GAME_MODE_META } from "@/lib/game/game-modes";
 
 export const metadata: Metadata = {
   title: "Match Detail — CoinDuel",
@@ -19,10 +20,12 @@ function PlayerSummary({
   label,
   player,
   isPro,
+  pnlLabel,
 }: {
   label: string;
   player: MatchPlayerRecord;
   isPro: boolean;
+  pnlLabel: string;
 }) {
   const pnl = fixedPnlOf(player);
   return (
@@ -38,7 +41,7 @@ function PlayerSummary({
       <p className="mt-1 text-xs text-muted">
         {getRankForMmr(player.mmrBefore)} &middot; {player.mmrBefore.toLocaleString()} MMR
       </p>
-      <p className="mt-3 text-[10px] font-semibold tracking-[0.25em] text-muted">ALL-TIME PNL</p>
+      <p className="mt-3 text-[10px] font-semibold tracking-[0.25em] text-muted">{pnlLabel}</p>
       <p className={`mt-1 text-2xl font-extrabold ${pnl >= 0 ? "text-accent" : "text-loss"}`}>
         {formatPnl(pnl)}
       </p>
@@ -99,9 +102,13 @@ export default async function MatchDetailPage(props: PageProps<"/matches/[id]">)
         >
           {isWin ? "VICTORY" : "DEFEAT"}
         </span>
-        {!match.isRanked && (
+        {!match.isRanked ? (
           <span className="rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted">
             PRIVATE DUEL &middot; DID NOT AFFECT MMR
+          </span>
+        ) : (
+          <span className="rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted">
+            {GAME_MODE_META[match.gameMode].label}
           </span>
         )}
         <span className="text-xs text-muted">
@@ -110,11 +117,17 @@ export default async function MatchDetailPage(props: PageProps<"/matches/[id]">)
       </div>
 
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <PlayerSummary label="YOU" player={me} isPro={proStatus[me.userId] ?? false} />
+        <PlayerSummary
+          label="YOU"
+          player={me}
+          isPro={proStatus[me.userId] ?? false}
+          pnlLabel={GAME_MODE_META[match.gameMode].label}
+        />
         <PlayerSummary
           label="OPPONENT"
           player={opponent}
           isPro={proStatus[opponent.userId] ?? false}
+          pnlLabel={GAME_MODE_META[match.gameMode].label}
         />
       </div>
 

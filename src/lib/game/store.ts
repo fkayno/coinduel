@@ -9,6 +9,8 @@
  * withLock, etc.) from there instead.
  */
 
+import type { GameMode } from "@/lib/game/game-modes";
+
 export type MatchStatus = "FOUND" | "ACTIVE" | "COMPLETED";
 export type MatchResult = "WIN" | "LOSS";
 
@@ -80,6 +82,8 @@ export interface StoredMatch {
   forfeitedBy: string | null;
   /** false for a CoinDuel Pro private duel — never affects ranked MMR. See match-service.ts's applyMatchResult(). */
   isRanked: boolean;
+  /** Which Solana Tracker PNL timeframe both players were compared on — see game-modes.ts. */
+  gameMode: GameMode;
   players: [MatchPlayerRecord, MatchPlayerRecord];
 }
 
@@ -87,5 +91,6 @@ export interface QueueEntry {
   userId: string;
   username: string;
   mmr: number;
+  gameMode: GameMode;
   joinedAt: string;
 }

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getRankForMmr } from "@/lib/game/mmr";
 import { findActiveMatchForUser } from "@/lib/db/matches";
 import { hasProAccess } from "@/lib/billing/entitlement";
+import { getModeStats } from "@/lib/db/mode-ratings";
 import { PlayHub } from "@/components/play/play-hub";
 import { PrivateDuelPanel } from "@/components/play/private-duel-panel";
 
@@ -44,14 +45,22 @@ export default async function PlayPage() {
 
   const isPro = await hasProAccess(user.id);
 
+  const [thirtyDay, sevenDay, oneDay] = await Promise.all([
+    getModeStats(user.id, "THIRTY_DAYS"),
+    getModeStats(user.id, "SEVEN_DAYS"),
+    getModeStats(user.id, "ONE_DAY"),
+  ]);
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-20">
       <PlayHub
-        mmr={user.mmr}
-        wins={user.wins}
-        losses={user.losses}
-        streak={user.streak}
         rank={getRankForMmr(user.mmr)}
+        statsByMode={{
+          ALL_TIME: { mmr: user.mmr, wins: user.wins, losses: user.losses, streak: user.streak },
+          THIRTY_DAYS: thirtyDay,
+          SEVEN_DAYS: sevenDay,
+          ONE_DAY: oneDay,
+        }}
       />
       <PrivateDuelPanel isPro={isPro} />
     </div>

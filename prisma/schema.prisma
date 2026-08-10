@@ -52,6 +52,7 @@ model User {
   subscription Subscription?
   hostedPrivateRooms      PrivateRoom[]
   tournamentParticipants  TournamentParticipant[]
+  modeRatings             ModeRating[]
 
   // Supports a future MMR-sorted leaderboard query — the leaderboard UI is
   // currently mock data (pre-existing, out of scope of this migration), but
@@ -105,6 +106,15 @@ model Match {
   // ranked MMR. Everything else (live cameras, 30s clock, real wallet PNL,
   // PNL comparison, match history) is identical either way.
   isRanked Boolean @default(true)
+
+  // "ALL_TIME" | "THIRTY_DAYS" | "SEVEN_DAYS" | "ONE_DAY" — see
+  // src/lib/game/game-modes.ts. Defaulted to "ALL_TIME" so every match
+  // created before this column existed is correctly treated as an
+  // All-Time match with zero backfill needed. Immutable after creation —
+  // determines which Solana Tracker timeframe was used for both players'
+  // PNL (src/lib/game/pnl-service.ts) and which rating (User's ALL_TIME
+  // columns, or a ModeRating row below) a ranked result updates.
+  gameMode String @default("ALL_TIME")
 
   players MatchPlayer[]
   videoSignals   VideoSignal[]
@@ -178,6 +188,11 @@ model QueueEntry {
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   username String
   mmr      Int
+  // "ALL_TIME" | "THIRTY_DAYS" | "SEVEN_DAYS" | "ONE_DAY" — see
+  // src/lib/game/game-modes.ts for the canonical enum. Defaulted so the
+  // column can be added without a backfill; matchmaking only ever pairs
+  // entries with an identical gameMode (src/lib/game/matchmaking.ts).
+  gameMode String   @default("ALL_TIME")
   joinedAt DateTime @default(now())
 }
 
@@ -233,6 +248,32 @@ model StripeEvent {
   id        String   @id
   type      String
   createdAt DateTime @default(now())
+}
+
+// Per-game-mode MMR/wins/losses for the three timed ranked modes
+// (THIRTY_DAYS/SEVEN_DAYS/ONE_DAY) added alongside the original ranked
+// system. Deliberately does NOT have an "ALL_TIME" row for anyone — the
+// original All-Time ranked MMR/wins/losses/streak keep living on User
+// exactly as before, untouched, so existing players lose nothing and no
+// backfill/migration of historical data is needed. A row here is only
+// created the first time a user completes a ranked match in that specific
+// mode (see src/lib/db/mode-ratings.ts); before that, that mode's rating is
+// just the default (1000 MMR, 0/0) matching a brand-new account.
+model ModeRating {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "THIRTY_DAYS" | "SEVEN_DAYS" | "ONE_DAY" — never "ALL_TIME" (see above).
+  gameMode  String
+  mmr       Int      @default(1000)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  streak    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, gameMode])
+  // Supports a future per-mode leaderboard query, same purpose as User's
+  // @@index([mmr]) for the All-Time leaderboard.
+  @@index([gameMode, mmr])
 }
 
 // A PRO-only short-code 1v1 room (spec section 7). Deliberately thin: once

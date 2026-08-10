@@ -61,6 +61,77 @@ export async function fetchWalletTotalPnl(walletAddress: string): Promise<number
   return totalPnl;
 }
 
+/**
+ * Solana Tracker's own accepted `period` values for the wallet performance
+ * endpoint (`1d | 7d | 14d | 30d | 90d | all`) — this module only ever uses
+ * the three CoinDuel actually needs for the timed game modes.
+ */
+export type SolanaTrackerPeriod = "1d" | "7d" | "30d";
+
+/**
+ * Fetches a wallet's REALIZED profit/loss for a specific trailing window
+ * (last 24h / 7 days / 30 days) from Solana Tracker's wallet performance
+ * endpoint — a different endpoint from fetchWalletTotalPnl() above, which
+ * only ever returns the ALL-TIME total.
+ *
+ * Endpoint verified against https://docs.solanatracker.io (PnL v2 wallet
+ * performance):
+ *
+ *   curl "https://data.solanatracker.io/v2/pnl/wallets/{wallet}/performance?period=7d" \
+ *     -H "x-api-key: YOUR_API_KEY"
+ *   -> { window: 7, totals: { realizedPnl: number, volume, trades }, ... }
+ *
+ * IMPORTANT ASYMMETRY vs. fetchWalletTotalPnl(): the all-time summary
+ * endpoint's `pnl.total` is realized + unrealized (current paper value of
+ * still-open positions) combined. This performance endpoint's `totals` only
+ * exposes `realizedPnl` for the window — Solana Tracker does not report a
+ * combined realized+unrealized figure scoped to an arbitrary trailing
+ * window, only "right now" (which isn't meaningfully attributable to "the
+ * last 7 days" specifically). Rather than approximate a combined number by
+ * mixing two different snapshots, timed modes compare REALIZED PNL for the
+ * selected window — a real, directly-API-supported value, not a fabricated
+ * or estimated one. See game-modes.ts's GAME_MODE_META descriptions, which
+ * this asymmetry is intentionally kept honest with ("compare your PNL from
+ * the last N days" — trades actually closed in that window).
+ */
+export async function fetchWalletPeriodRealizedPnl(
+  walletAddress: string,
+  period: SolanaTrackerPeriod
+): Promise<number> {
+  const apiKey = process.env.SOLANA_TRACKER_API_KEY;
+  if (!apiKey) {
+    throw new SolanaTrackerError("SOLANA_TRACKER_API_KEY is not configured.");
+  }
+
+  const url = `${SOLANA_TRACKER_API_BASE}/v2/pnl/wallets/${encodeURIComponent(walletAddress)}/performance?period=${period}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        "x-api-key": apiKey,
+        accept: "application/json",
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new SolanaTrackerError(`Solana Tracker request failed: ${(error as Error).message}`);
+  }
+
+  if (!res.ok) {
+    throw new SolanaTrackerError(`Solana Tracker API responded with ${res.status}`);
+  }
+
+  const data = await res.json().catch(() => null);
+  const realizedPnl = data?.totals?.realizedPnl;
+
+  if (typeof realizedPnl !== "number" || Number.isNaN(realizedPnl)) {
+    throw new SolanaTrackerError("Solana Tracker response did not include a numeric realized PnL.");
+  }
+
+  return realizedPnl;
+}
+
 export interface TopTokenResult {
   symbol: string;
   name: string;

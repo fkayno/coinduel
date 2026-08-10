@@ -15,6 +15,7 @@ import type {
   StoredMatch,
   TopToken,
 } from "@/lib/game/store";
+import type { GameMode } from "@/lib/game/game-modes";
 
 /**
  * SERVER-ONLY. PostgreSQL-backed replacement for the old
@@ -90,6 +91,7 @@ function mapMatch(matchRow: MatchRow, playerRows: MatchPlayerRow[]): StoredMatch
     pnlError: matchRow.pnlError,
     forfeitedBy: matchRow.forfeitedBy,
     isRanked: matchRow.isRanked,
+    gameMode: matchRow.gameMode as GameMode,
     players,
   };
 }
@@ -125,6 +127,7 @@ export async function saveMatch(match: StoredMatch): Promise<StoredMatch> {
         duration: match.duration,
         createdAt: new Date(match.createdAt),
         isRanked: match.isRanked,
+        gameMode: match.gameMode,
         ...matchData,
       },
       update: matchData,
@@ -191,7 +194,13 @@ export async function listMatchesForUser(userId: string): Promise<StoredMatch[]>
 // --- Matchmaking queue ---
 
 function mapQueueEntry(row: QueueEntryRow): QueueEntry {
-  return { userId: row.userId, username: row.username, mmr: row.mmr, joinedAt: row.joinedAt.toISOString() };
+  return {
+    userId: row.userId,
+    username: row.username,
+    mmr: row.mmr,
+    gameMode: row.gameMode as GameMode,
+    joinedAt: row.joinedAt.toISOString(),
+  };
 }
 
 export async function getQueueEntry(userId: string): Promise<QueueEntry | null> {
@@ -208,8 +217,19 @@ export async function listQueue(): Promise<QueueEntry[]> {
 export async function addToQueue(entry: QueueEntry): Promise<void> {
   await prisma.queueEntry.upsert({
     where: { userId: entry.userId },
-    create: { userId: entry.userId, username: entry.username, mmr: entry.mmr, joinedAt: new Date(entry.joinedAt) },
-    update: { username: entry.username, mmr: entry.mmr, joinedAt: new Date(entry.joinedAt) },
+    create: {
+      userId: entry.userId,
+      username: entry.username,
+      mmr: entry.mmr,
+      gameMode: entry.gameMode,
+      joinedAt: new Date(entry.joinedAt),
+    },
+    update: {
+      username: entry.username,
+      mmr: entry.mmr,
+      gameMode: entry.gameMode,
+      joinedAt: new Date(entry.joinedAt),
+    },
   });
 }
 

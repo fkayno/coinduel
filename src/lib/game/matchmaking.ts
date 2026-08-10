@@ -17,11 +17,19 @@ export function getSearchRangeForWaitTime(waitingSeconds: number): number {
   return MMR_SEARCH_RANGES[step];
 }
 
-/** Closest other queued real player within `range` MMR of `entry`. Never matches self. */
+/**
+ * Closest other queued real player within `range` MMR of `entry`, PLAYING
+ * THE SAME GAME MODE. Never matches self, never matches across modes — an
+ * ALL_TIME player and a THIRTY_DAYS player must never be paired, since
+ * their PNL would be fetched on incomparable timeframes.
+ */
 export async function findQueueOpponent(entry: QueueEntry, range: number): Promise<QueueEntry | null> {
   const queue = await listQueue();
   const candidates = queue.filter(
-    (other) => other.userId !== entry.userId && Math.abs(other.mmr - entry.mmr) <= range
+    (other) =>
+      other.userId !== entry.userId &&
+      other.gameMode === entry.gameMode &&
+      Math.abs(other.mmr - entry.mmr) <= range
   );
   if (candidates.length === 0) return null;
 

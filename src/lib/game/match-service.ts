@@ -1,11 +1,13 @@
 import { MATCH_DURATION_SECONDS } from "@/lib/config";
 import { updateUserStats } from "@/lib/db/users";
+import { updateModeStats, type TimedGameMode } from "@/lib/db/mode-ratings";
 import { calculateEloChange } from "@/lib/game/mmr";
 import { generatePnlSeed, getPnlProvider, PnlUnavailableError } from "@/lib/game/pnl-service";
 import { getTopToken } from "@/lib/game/top-token-service";
 import type { MockOpponent } from "@/lib/game/bots";
 import { createMatchId, getMatch, saveMatch, withLock } from "@/lib/db/matches";
 import type { MatchPlayerRecord, StoredMatch } from "@/lib/game/store";
+import { DEFAULT_GAME_MODE, type GameMode } from "@/lib/game/game-modes";
 
 export interface MatchPlayerInput {
   userId: string;
@@ -67,11 +69,17 @@ function toRecord(p: MatchPlayerInput): MatchPlayerRecord {
  * `isRanked` defaults to true (every existing ranked/queue/bot call site is
  * unaffected); private duels (src/lib/game/private-duel-service.ts) pass
  * false, which applyMatchResult() below uses to skip Elo/MMR entirely.
+ *
+ * `gameMode` defaults to ALL_TIME so every existing call site (and every
+ * historical match) is unaffected — it determines which Solana Tracker
+ * timeframe ensurePnlFetched() below uses for BOTH players, and which
+ * rating applyMatchResult() updates on completion.
  */
 export async function createMatch(
   playerA: MatchPlayerInput,
   playerB: MatchPlayerInput,
-  isRanked = true
+  isRanked = true,
+  gameMode: GameMode = DEFAULT_GAME_MODE
 ): Promise<StoredMatch> {
   const match: StoredMatch = {
     id: createMatchId(),
@@ -86,6 +94,7 @@ export async function createMatch(
     pnlError: null,
     forfeitedBy: null,
     isRanked,
+    gameMode,
     players: [toRecord(playerA), toRecord(playerB)],
   };
   return saveMatch(match);
@@ -110,7 +119,7 @@ async function ensurePnlFetched(match: StoredMatch): Promise<StoredMatch> {
     const players = (await Promise.all(
       match.players.map(async (p) => {
         const [startingPnl, topToken] = await Promise.all([
-          provider.getFixedPnl(p.walletAddress ?? "", p.pnlSeed),
+          provider.getFixedPnl(p.walletAddress ?? "", p.pnlSeed, match.gameMode),
           getTopToken(p.walletAddress ?? "", p.pnlSeed),
         ]);
         return { ...p, startingPnl, topToken };
@@ -242,9 +251,20 @@ async function applyMatchResult(
     loser.mmrAfter = loser.isBot ? loser.mmrBefore : loser.mmrBefore + loserChange;
 
     // Only real users have a persisted profile to update — MMR/W-L/streak
-    // never touch a bot "account" because there isn't one.
-    if (!winner.isBot) await updateUserStats(winner.userId, { mmr: winner.mmrAfter, won: true });
-    if (!loser.isBot) await updateUserStats(loser.userId, { mmr: loser.mmrAfter, won: false });
+    // never touch a bot "account" because there isn't one. ALL_TIME keeps
+    // updating User's own mmr/wins/losses/streak columns exactly as before
+    // game modes existed; the three timed modes get their own ModeRating
+    // row instead, so playing THIRTY_DAYS/SEVEN_DAYS/ONE_DAY never touches
+    // (and can never accidentally overwrite) a player's original All-Time
+    // ranked MMR.
+    if (match.gameMode === "ALL_TIME") {
+      if (!winner.isBot) await updateUserStats(winner.userId, { mmr: winner.mmrAfter, won: true });
+      if (!loser.isBot) await updateUserStats(loser.userId, { mmr: loser.mmrAfter, won: false });
+    } else {
+      const timedMode = match.gameMode as TimedGameMode;
+      if (!winner.isBot) await updateModeStats(winner.userId, timedMode, { mmr: winner.mmrAfter, won: true });
+      if (!loser.isBot) await updateModeStats(loser.userId, timedMode, { mmr: loser.mmrAfter, won: false });
+    }
   } else {
     winner.mmrAfter = winner.mmrBefore;
     loser.mmrAfter = loser.mmrBefore;

@@ -16,6 +16,7 @@ import { fixedPnlOf, formatPnl } from "@/lib/format";
 import { MAX_VIDEO_CONNECT_WAIT_SECONDS } from "@/lib/config";
 import type { MatchPlayerRecord } from "@/lib/game/store";
 import type { LiveMatchView } from "@/lib/game/match-service";
+import { GAME_MODE_META } from "@/lib/game/game-modes";
 
 interface DuelRoomProps {
   matchId: string;
@@ -125,14 +126,16 @@ function ArenaCameraRow({ leftCamera, rightCamera }: { leftCamera: ReactNode; ri
 function ArenaIdentityRow({
   left,
   right,
+  pnlLabel,
 }: {
   left: { label: string; player: MatchPlayerRecord; pnl: PnlDisplay; isPro: boolean };
   right: { label: string; player: MatchPlayerRecord; pnl: PnlDisplay; isPro: boolean };
+  pnlLabel: string;
 }) {
   return (
     <div className="grid w-full grid-cols-2 gap-3 sm:gap-8 lg:gap-10">
-      <ArenaIdentityBlock {...left} />
-      <ArenaIdentityBlock {...right} />
+      <ArenaIdentityBlock {...left} pnlLabel={pnlLabel} />
+      <ArenaIdentityBlock {...right} pnlLabel={pnlLabel} />
     </div>
   );
 }
@@ -142,11 +145,13 @@ function ArenaIdentityBlock({
   player,
   pnl,
   isPro,
+  pnlLabel,
 }: {
   label: string;
   player: MatchPlayerRecord;
   pnl: PnlDisplay;
   isPro: boolean;
+  pnlLabel: string;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-[560px] min-w-0 flex-col items-center gap-1 text-center">
@@ -172,7 +177,7 @@ function ArenaIdentityBlock({
         </span>
       </div>
       <span className="mt-2 text-[8px] font-semibold tracking-[0.2em] text-muted sm:mt-3 sm:text-[10px] sm:tracking-[0.25em]">
-        ALL-TIME PNL
+        {pnlLabel}
       </span>
       {pnl.kind === "value" ? (
         <AnimatedNumber
@@ -225,7 +230,10 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
   const opponent = view.match.players[opponentIndex];
   const isMePro = proStatus[me.userId] ?? false;
   const isOpponentPro = proStatus[opponent.userId] ?? false;
-  const modeLabel = view.match.isRanked ? "RANKED 1V1" : "PRIVATE DUEL";
+  const modeLabel = view.match.isRanked
+    ? `RANKED — ${GAME_MODE_META[view.match.gameMode].shortLabel}`
+    : "PRIVATE DUEL";
+  const pnlLabel = GAME_MODE_META[view.match.gameMode].label;
 
   // Video is an additional layer on top of the match — it starts as soon as
   // a match exists and tears down once the duel is over. It never gates or
@@ -535,6 +543,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
             pnl: { kind: "text", text: "—" },
             isPro: isOpponentPro,
           }}
+          pnlLabel={pnlLabel}
         />
         {videoControls}
       </div>
@@ -546,7 +555,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
       pnlStage === "checking"
         ? "VERIFYING TRADING PERFORMANCE..."
         : pnlStage === "fetching"
-          ? "FETCHING ALL-TIME PNL..."
+          ? `FETCHING ${pnlLabel}...`
           : "PNL VERIFIED";
     const pnlText: PnlDisplay = {
       kind: "text",
@@ -560,6 +569,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
         <ArenaIdentityRow
           left={{ label: "YOU", player: me, pnl: pnlText, isPro: isMePro }}
           right={{ label: "OPPONENT", player: opponent, pnl: pnlText, isPro: isOpponentPro }}
+          pnlLabel={pnlLabel}
         />
         <span
           key={stageText}
@@ -584,6 +594,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
         <ArenaIdentityRow
           left={{ label: "YOU", player: me, pnl: pnlText, isPro: isMePro }}
           right={{ label: "OPPONENT", player: opponent, pnl: pnlText, isPro: isOpponentPro }}
+          pnlLabel={pnlLabel}
         />
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-loss/50 bg-loss/5 px-8 py-6">
           <span className="text-lg font-extrabold tracking-wide text-loss">
@@ -591,7 +602,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
           </span>
           <p className="max-w-sm text-xs text-muted">
             {pnlFailReason ??
-              "We couldn't retrieve a verified wallet's real ALL-TIME PNL. Ranked matches never use random or estimated PNL, so this match can't start yet."}
+              `We couldn't retrieve a verified wallet's real ${pnlLabel}. Ranked matches never use random or estimated PNL, so this match can't start yet.`}
           </p>
           <div className="mt-1 flex flex-wrap justify-center gap-3">
             <button
@@ -631,6 +642,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
             pnl: { kind: "value", value: opponentPnl },
             isPro: isOpponentPro,
           }}
+          pnlLabel={pnlLabel}
         />
         <span key={countdown} className="animate-pop-in text-8xl font-extrabold text-accent">
           {countdown === 0 ? "DUEL" : countdown}
@@ -669,6 +681,7 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
             pnl: { kind: "value", value: opponentPnl },
             isPro: isOpponentPro,
           }}
+          pnlLabel={pnlLabel}
         />
 
         <div className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface-2 px-6 py-3">
@@ -713,6 +726,9 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
     <div className="flex flex-col items-center gap-8 py-10 text-center">
       <div className="flex flex-col items-center gap-2">
         <span className="text-xs font-bold tracking-[0.3em] text-muted">MATCH COMPLETE</span>
+        <span className="rounded-full border border-border px-3 py-1 text-[10px] font-bold tracking-widest text-muted">
+          {modeLabel}
+        </span>
         <span
           className={`animate-pop-in text-5xl font-extrabold tracking-tight sm:text-6xl ${
             isWinner ? "text-accent" : "text-foreground"
@@ -734,12 +750,12 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
 
       <div className="grid w-full max-w-md grid-cols-2 gap-3">
         <ResultTile
-          label="YOUR ALL-TIME PNL"
+          label={`YOUR ${pnlLabel}`}
           value={formatPnl(myFixedPnl)}
           tone={myFixedPnl >= 0 ? "positive" : "negative"}
         />
         <ResultTile
-          label="OPPONENT ALL-TIME PNL"
+          label={`OPPONENT ${pnlLabel}`}
           value={formatPnl(opponentFixedPnl)}
           tone={opponentFixedPnl >= 0 ? "positive" : "negative"}
         />

@@ -45,13 +45,19 @@ export async function GET() {
     // ============================================================
     // REAL MATCHMAKING LOGIC
     // ============================================================
+    // current.mmr/opponentEntry.mmr are already the correct MMR for
+    // `current.gameMode` (set when each player joined the queue — see
+    // /api/play/queue) — used here instead of user.mmr/opponentUser.mmr,
+    // which are only ever the ALL_TIME value.
     const opponentEntry = await findQueueOpponent(current, range);
     if (opponentEntry) {
       const opponentUser = await findUserById(opponentEntry.userId);
       if (opponentUser) {
         const match = await createMatch(
-          toMatchPlayerInput(user),
-          toMatchPlayerInput(toPublicUser(opponentUser))
+          { ...toMatchPlayerInput(user), mmr: current.mmr },
+          { ...toMatchPlayerInput(toPublicUser(opponentUser)), mmr: opponentEntry.mmr },
+          true,
+          current.gameMode
         );
         await removeFromQueue(user.id);
         await removeFromQueue(opponentEntry.userId);
@@ -64,7 +70,12 @@ export async function GET() {
     // ============================================================
     if (DEV_MOCK_OPPONENT_ENABLED && waitingSeconds >= DEV_MOCK_OPPONENT_DELAY_SECONDS) {
       const bot = pickMockOpponent(current.mmr);
-      const match = await createMatch(toMatchPlayerInput(user), botToMatchPlayerInput(bot));
+      const match = await createMatch(
+        { ...toMatchPlayerInput(user), mmr: current.mmr },
+        botToMatchPlayerInput(bot),
+        true,
+        current.gameMode
+      );
       await removeFromQueue(user.id);
       return match.id;
     }
@@ -80,6 +91,7 @@ export async function GET() {
   return NextResponse.json({
     state: "queued",
     mmr: entry.mmr,
+    gameMode: entry.gameMode,
     waitingSeconds: Math.round(waitingSeconds),
     rangeMmr: getSearchRangeForWaitTime(waitingSeconds),
   });
