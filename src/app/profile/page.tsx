@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { getRankForMmr } from "@/lib/game/mmr";
 import { hasProAccess } from "@/lib/billing/entitlement";
 import { WalletVerificationPanel } from "@/components/wallet/wallet-verification-panel";
+import { WalletSafetyButton } from "@/components/wallet/wallet-safety-modal";
 import { Avatar } from "@/components/ui/avatar";
 import { ProBadge } from "@/components/ui/pro-badge";
 import { AvatarUploadPanel } from "@/components/profile/avatar-upload-panel";
@@ -76,6 +77,7 @@ export default async function ProfilePage() {
           A verified wallet is required to play ranked matches. Verifying proves you control the
           wallet — it never asks for your seed phrase or private key.
         </p>
+        <WalletSafetyButton />
       </div>
 
       <p className="mt-10 text-sm text-muted">
