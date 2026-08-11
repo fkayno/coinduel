@@ -29,8 +29,12 @@ export function WalletSafetyButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 text-xs font-semibold text-muted underline decoration-dotted underline-offset-4 transition-colors duration-150 hover:text-foreground"
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-bold tracking-wide text-accent transition-colors duration-150 hover:bg-accent/20"
       >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 12l1.8 1.8L15 10" />
+        </svg>
         Is this safe?
       </button>
 
