@@ -9,14 +9,21 @@ const isDev = process.env.NODE_ENV !== "production";
 // (Phantom/Solflare) communicate via an injected `window` object, not
 // network requests, so they need no CSP entry. `unsafe-eval` is dev-only —
 // production Next.js bundles don't need it, only the dev-mode HMR runtime does.
+//
+// Google AdSense (src/app/layout.tsx's <Script>) needs its own allowances —
+// it loads scripts, opens ad iframes, and fetches creative images from a
+// number of Google-operated domains. Google adds new domains periodically,
+// so if an ad-related CSP violation shows up in the browser console later,
+// the fix is adding that exact origin to the relevant directive here, not
+// loosening the policy generally.
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://googleads.g.doubleclick.net https://fundingchoicesmessages.google.com https://adtrafficquality.google https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://*.supabase.co",
+  "img-src 'self' data: https://*.supabase.co https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.gstatic.com https://*.adtrafficquality.google",
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co${isDev ? " ws:" : ""}`,
-  "frame-src 'self' https://checkout.stripe.com https://billing.stripe.com",
+  `connect-src 'self' https://*.supabase.co${isDev ? " ws:" : ""} https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://adtrafficquality.google https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google https://fundingchoicesmessages.google.com`,
+  "frame-src 'self' https://checkout.stripe.com https://billing.stripe.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://fundingchoicesmessages.google.com https://adtrafficquality.google https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google https://www.google.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
