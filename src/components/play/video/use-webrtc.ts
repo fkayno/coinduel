@@ -116,8 +116,29 @@ export function useWebRTC({
       }
     }
 
+    async function fetchIceServers(): Promise<RTCIceServer[]> {
+      // TURN credentials are optional (see src/lib/webrtc/turn.ts) — when
+      // Cloudflare isn't configured, or this fetch fails/is slow, fall back
+      // to the static STUN-only list rather than ever blocking the match.
+      try {
+        const res = await fetch(`/api/play/match/${matchId}/turn-credentials`);
+        if (!res.ok) return ICE_SERVERS;
+        const data = await res.json();
+        return Array.isArray(data?.iceServers) && data.iceServers.length > 0
+          ? data.iceServers
+          : ICE_SERVERS;
+      } catch {
+        return ICE_SERVERS;
+      }
+    }
+
     async function setup() {
       setConnectionStatus("requesting-permissions");
+
+      // Kicked off in parallel with getUserMedia below — independent, and
+      // this way the TURN fetch's latency is hidden behind the camera/mic
+      // permission prompt instead of adding to it.
+      const iceServersPromise = fetchIceServers();
 
       let stream: MediaStream | null = null;
       let camDenied = false;
@@ -160,7 +181,12 @@ export function useWebRTC({
       setLocalStream(stream);
       localStreamRef.current = stream;
 
-      pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const iceServers = await iceServersPromise;
+      if (cancelled) {
+        stream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      pc = new RTCPeerConnection({ iceServers });
 
       stream?.getTracks().forEach((track) => {
         if (stream) pc!.addTrack(track, stream);

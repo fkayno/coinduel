@@ -46,10 +46,13 @@ export const MOCK_SOLANA_TRACKER = process.env.MOCK_SOLANA_TRACKER !== "false";
  * WebSocket server anyway. The actual audio/video media is still genuine
  * peer-to-peer WebRTC and never touches the server.
  *
- * STUN-only: works for same-network/simple-NAT testing. Production-grade
- * cross-network reliability needs a TURN server too (e.g. Twilio Network
- * Traversal Service, Xirsys, Cloudflare Calls, or self-hosted coturn) —
- * intentionally not wired up here since it requires third-party credentials.
+ * This constant is the STUN-only fallback. When CLOUDFLARE_TURN_KEY_ID /
+ * CLOUDFLARE_TURN_KEY_API_TOKEN are set (see .env.example), the client
+ * fetches short-lived TURN credentials per match instead — see
+ * src/lib/webrtc/turn.ts and src/components/play/video/use-webrtc.ts — for
+ * the cross-network reliability STUN alone can't provide (symmetric NAT,
+ * some mobile/corporate networks). Still used verbatim whenever TURN isn't
+ * configured or that fetch fails, so video/audio never blocks the match.
  */
 export const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
