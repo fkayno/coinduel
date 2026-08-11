@@ -28,6 +28,10 @@ export function PrivateDuelPanel({ isPro }: PrivateDuelPanelProps) {
   }, []);
 
   async function handleCreate() {
+    if (!isPro) {
+      router.push(`/pricing?reason=${encodeURIComponent(UPGRADE_REASON)}`);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -62,6 +66,10 @@ export function PrivateDuelPanel({ isPro }: PrivateDuelPanelProps) {
   }
 
   async function handleJoin() {
+    if (!isPro) {
+      router.push(`/pricing?reason=${encodeURIComponent(UPGRADE_REASON)}`);
+      return;
+    }
     if (!joinCode.trim()) {
       setError("Enter a room code.");
       return;
@@ -85,28 +93,19 @@ export function PrivateDuelPanel({ isPro }: PrivateDuelPanelProps) {
     }
   }
 
-  if (!isPro) {
-    return (
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface p-6">
-        <div>
-          <span className="text-xs font-semibold tracking-widest text-muted">PRIVATE DUEL</span>
-          <p className="mt-1 text-sm text-muted">
-            Create private 1v1 rooms and invite another player using a room code.
-          </p>
-        </div>
-        <Link
-          href={`/pricing?reason=${encodeURIComponent(UPGRADE_REASON)}`}
-          className="shrink-0 rounded-md bg-accent px-5 py-2.5 text-xs font-bold tracking-wide text-black transition-all duration-150 hover:bg-accent-dim active:scale-[0.98]"
-        >
-          GET PRO
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div className="mt-10 rounded-2xl border border-border bg-surface p-6">
-      <span className="text-xs font-semibold tracking-widest text-muted">PRIVATE DUEL</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-xs font-semibold tracking-widest text-muted">PRIVATE DUEL</span>
+        {!isPro && (
+          <Link
+            href={`/pricing?reason=${encodeURIComponent(UPGRADE_REASON)}`}
+            className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[10px] font-bold tracking-wide text-accent transition-colors duration-150 hover:bg-accent/20"
+          >
+            PRO FEATURE
+          </Link>
+        )}
+      </div>
 
       {view === "idle" && (
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
