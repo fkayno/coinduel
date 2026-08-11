@@ -76,6 +76,24 @@ export function VideoTile({
     videoRef.current?.play().catch(() => setNeedsAudioTap(true));
   }
 
+  // Belt-and-suspenders for the autoplay block above: don't rely on the
+  // player noticing and hitting the small "TAP FOR SOUND" badge — retry
+  // play() on ANY interaction anywhere on the page while it's blocked
+  // (clicking a control, tapping the video itself, etc. all satisfy the
+  // browser's user-gesture requirement equally well). This is the fix for
+  // "I didn't hear my opponent" reports where the player never noticed the
+  // dedicated button.
+  useEffect(() => {
+    if (!needsAudioTap) return;
+    const retry = () => videoRef.current?.play().then(() => setNeedsAudioTap(false), () => {});
+    document.addEventListener("pointerdown", retry, { once: true });
+    document.addEventListener("keydown", retry, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", retry);
+      document.removeEventListener("keydown", retry);
+    };
+  }, [needsAudioTap]);
+
   return (
     <div
       className={`relative aspect-square w-full overflow-hidden rounded-3xl border-2 border-border bg-surface-2 shadow-[0_0_60px_-20px_rgba(34,224,122,0.25)] ${className}`}
