@@ -47,6 +47,11 @@ export function VideoTile({
   topTokenReady = false,
   className = "",
 }: VideoTileProps) {
+  // Tracks the specific URL that failed, not just a boolean — so a new
+  // token (different imageUrl) automatically gets a fresh chance to load
+  // instead of staying stuck on a previous token's failure.
+  const [erroredImageUrl, setErroredImageUrl] = useState<string | null>(null);
+  const topTokenImageFailed = topToken?.imageUrl != null && topToken.imageUrl === erroredImageUrl;
   const videoRef = useRef<HTMLVideoElement>(null);
   // Some browsers silently block autoplay of an UNMUTED <video> element
   // (audio autoplay policy) with no error surfaced anywhere by default —
@@ -126,11 +131,12 @@ export function VideoTile({
                 MOST PROFITABLE
               </span>
               <span className="flex min-w-0 items-center gap-1 sm:gap-2">
-                {topToken.imageUrl ? (
+                {topToken.imageUrl && !topTokenImageFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={topToken.imageUrl}
                     alt=""
+                    onError={() => setErroredImageUrl(topToken.imageUrl)}
                     className="h-3 w-3 shrink-0 rounded-full object-cover sm:h-8 sm:w-8"
                   />
                 ) : (
