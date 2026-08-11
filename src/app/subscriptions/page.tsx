@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/current-user";
 import { getSubscriptionByUserId } from "@/lib/db/subscriptions";
 import { createPortalSessionAction } from "@/lib/billing/actions";
-import { PRO_MONTHLY_PRICE_USD } from "@/lib/billing/plans";
+import { PRO_FEATURES, PRO_MONTHLY_PRICE_USD } from "@/lib/billing/plans";
 import { formatDate } from "@/lib/format";
 import { ProBadge } from "@/components/ui/pro-badge";
 
@@ -104,6 +104,28 @@ export default async function SubscriptionsPage() {
         Billing, invoices, payment methods, and cancellation are all managed securely through
         Stripe&apos;s Customer Portal.
       </p>
+
+      <div className="mt-10 rounded-2xl border border-accent/30 bg-surface p-8">
+        <span className="text-xs font-semibold tracking-widest text-accent">
+          {isPro ? "WHAT YOU GET WITH PRO" : "WHAT COINDUEL PRO UNLOCKS"}
+        </span>
+        <ul className="mt-5 flex flex-col gap-3">
+          {PRO_FEATURES.map((feature) => (
+            <li key={feature} className="flex items-center gap-2.5 text-sm text-foreground/90">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+        {!isPro && (
+          <Link
+            href="/pricing"
+            className="mt-6 inline-block rounded-md bg-accent px-6 py-3 text-sm font-bold tracking-wide text-black transition-all duration-150 hover:bg-accent-dim active:scale-[0.98]"
+          >
+            GET PRO — ${PRO_MONTHLY_PRICE_USD}/month
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
