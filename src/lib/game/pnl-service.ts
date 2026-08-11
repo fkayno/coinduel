@@ -10,20 +10,12 @@ import type { GameMode } from "@/lib/game/game-modes";
  * the match starts and never recomputed — it is explicitly NOT derived
  * from elapsed match time or live coin price movement. Real integration:
  * Solana Tracker's wallet PnL endpoints (solanatracker.io):
- *   - ALL_TIME: the wallet's all-time total (realized + unrealized), plus
- *     its real overall ROI % (Solana Tracker's own `summary.roi` field)
+ *   - ALL_TIME: the wallet's all-time total (realized + unrealized)
  *   - THIRTY_DAYS / SEVEN_DAYS / ONE_DAY: the wallet's REALIZED PnL over
  *     that trailing window (see solanatracker-client.ts's
  *     fetchWalletPeriodRealizedPnl doc comment for why this is realized-only,
- *     not a fabricated realized+unrealized blend) — that endpoint has no
- *     equivalent window-scoped ROI %, so pnlPercent is always null here.
+ *     not a fabricated realized+unrealized blend).
  */
-export interface FixedPnlResult {
-  pnl: number;
-  /** Real return-on-capital %, only when the data source actually reports one (currently ALL_TIME only). Never estimated. */
-  pnlPercent: number | null;
-}
-
 export interface PnlProvider {
   /**
    * The player's fixed PNL for an entire match under the given game mode,
@@ -35,7 +27,7 @@ export interface PnlProvider {
    * callers can surface a real "unable to verify PNL" error rather than
    * starting a ranked match on made-up data.
    */
-  getFixedPnl(walletAddress: string, seed: number, gameMode: GameMode): Promise<FixedPnlResult>;
+  getFixedPnl(walletAddress: string, seed: number, gameMode: GameMode): Promise<number>;
 }
 
 /** Thrown when real wallet PNL can't be retrieved and MUST NOT be faked. */
@@ -57,16 +49,13 @@ function mulberry32(seed: number) {
  * number, mixed with the game mode so the four modes don't return identical
  * mock values for the same seed. DEVELOPMENT ONLY (MOCK_SOLANA_TRACKER=true)
  * — never used as a fallback for a failed real lookup, and never presented
- * as real blockchain activity. Only fabricates a percent for ALL_TIME, to
- * mirror the real provider's shape (null for timed modes) during local dev.
+ * as real blockchain activity.
  */
-function mockFixedPnl(seed: number, gameMode: GameMode): FixedPnlResult {
+function mockFixedPnl(seed: number, gameMode: GameMode): number {
   const modeOffset = GAME_MODES_ORDER.indexOf(gameMode);
   const random = mulberry32(seed + modeOffset * 7919);
-  const pnl = Math.round((random() - 0.35) * 400 * 100) / 100;
-  const pnlPercent =
-    gameMode === "ALL_TIME" ? Math.round((random() - 0.3) * 120 * 100) / 100 : null;
-  return { pnl, pnlPercent };
+  const pnl = (random() - 0.35) * 400;
+  return Math.round(pnl * 100) / 100;
 }
 
 const GAME_MODES_ORDER: GameMode[] = ["ALL_TIME", "THIRTY_DAYS", "SEVEN_DAYS", "ONE_DAY"];
@@ -83,16 +72,14 @@ const provider: PnlProvider = {
 
     try {
       switch (gameMode) {
-        case "ALL_TIME": {
-          const { pnl, roiPercent } = await fetchWalletTotalPnl(walletAddress);
-          return { pnl, pnlPercent: roiPercent };
-        }
+        case "ALL_TIME":
+          return await fetchWalletTotalPnl(walletAddress);
         case "THIRTY_DAYS":
-          return { pnl: await fetchWalletPeriodRealizedPnl(walletAddress, "30d"), pnlPercent: null };
+          return await fetchWalletPeriodRealizedPnl(walletAddress, "30d");
         case "SEVEN_DAYS":
-          return { pnl: await fetchWalletPeriodRealizedPnl(walletAddress, "7d"), pnlPercent: null };
+          return await fetchWalletPeriodRealizedPnl(walletAddress, "7d");
         case "ONE_DAY":
-          return { pnl: await fetchWalletPeriodRealizedPnl(walletAddress, "1d"), pnlPercent: null };
+          return await fetchWalletPeriodRealizedPnl(walletAddress, "1d");
       }
     } catch (error) {
       // Real Solana Tracker call failed — this must NEVER fall back to mock

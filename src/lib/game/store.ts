@@ -52,13 +52,6 @@ export interface MatchPlayerRecord {
   startingPnl: number | null;
   endingPnl: number | null;
   pnlChange: number | null;
-  /**
-   * Real all-time return-on-capital %, only when the underlying game mode's
-   * data source actually reports one (currently ALL_TIME only — see
-   * pnl-service.ts). Null for THIRTY_DAYS/SEVEN_DAYS/ONE_DAY, meaning
-   * "display dollar PNL instead", never "0%".
-   */
-  pnlPercent: number | null;
   result: MatchResult | null;
   topToken: TopToken | null;
 }

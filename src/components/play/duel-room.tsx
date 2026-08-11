@@ -791,12 +791,6 @@ export function DuelRoom({ matchId, currentUserId, initialView, proStatus }: Due
         >
           VIEW MATCH HISTORY
         </Link>
-        <Link
-          href={`/matches/${view.match.id}/share`}
-          className="rounded-md border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-bold tracking-wide text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
-          SHARE RESULT
-        </Link>
       </div>
     </div>
   );

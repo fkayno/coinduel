@@ -140,15 +140,6 @@ export default async function MatchDetailPage(props: PageProps<"/matches/[id]">)
         />
         <Tile label="MMR AFTER" value={(me.mmrAfter ?? me.mmrBefore).toLocaleString()} />
       </div>
-
-      <div className="mt-6 flex justify-center">
-        <Link
-          href={`/matches/${match.id}/share`}
-          className="rounded-md border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-bold tracking-wide text-accent transition-colors duration-150 hover:bg-accent/20"
-        >
-          SHARE RESULT
-        </Link>
-      </div>
     </div>
   );
 }

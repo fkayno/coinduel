@@ -161,14 +161,6 @@ model MatchPlayer {
   startingPnl Float?
   endingPnl   Float?
   pnlChange   Float?
-  // Overall wallet ROI %, only when the underlying data source actually
-  // reports one — currently just Solana Tracker's ALL_TIME summary
-  // endpoint (its real `roi` field). The three timed modes' Solana Tracker
-  // endpoint has no equivalent window-scoped return-on-capital figure, so
-  // this stays null for those rather than being estimated/fabricated (see
-  // src/lib/game/pnl-service.ts). Null means "show dollar PNL instead",
-  // never "0%".
-  pnlPercent  Float?
   result      String? // "WIN" | "LOSS"
   // Decorative only — the player's most profitable memecoin (see
   // src/lib/game/top-token-service.ts). Never affects match outcome.
