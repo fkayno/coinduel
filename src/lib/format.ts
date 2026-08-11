@@ -25,6 +25,17 @@ export function fixedPnlOf(player: MatchPlayerRecord): number {
   return player.endingPnl ?? player.startingPnl ?? 0;
 }
 
+/**
+ * What to show for a player's PNL on the share card / result screen: a real
+ * percent when the game mode's data source actually reports one (currently
+ * ALL_TIME only, via player.pnlPercent — see pnl-service.ts), otherwise the
+ * real dollar amount. Never computes/estimates a percent that Solana
+ * Tracker didn't itself provide.
+ */
+export function shareDisplayOf(player: MatchPlayerRecord): string {
+  return player.pnlPercent != null ? formatPercent(player.pnlPercent) : formatPnl(fixedPnlOf(player));
+}
+
 export function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString("en-US", {
     month: "long",

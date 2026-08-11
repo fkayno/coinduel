@@ -68,6 +68,7 @@ function mapPlayer(row: MatchPlayerRow): MatchPlayerRecord {
     startingPnl: row.startingPnl,
     endingPnl: row.endingPnl,
     pnlChange: row.pnlChange,
+    pnlPercent: row.pnlPercent,
     result: row.result as MatchResult | null,
     topToken,
   };
@@ -150,6 +151,7 @@ export async function saveMatch(match: StoredMatch): Promise<StoredMatch> {
         startingPnl: p.startingPnl,
         endingPnl: p.endingPnl,
         pnlChange: p.pnlChange,
+        pnlPercent: p.pnlPercent,
         result: p.result,
         topTokenSymbol: p.topToken?.symbol ?? null,
         topTokenName: p.topToken?.name ?? null,

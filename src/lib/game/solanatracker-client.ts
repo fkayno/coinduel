@@ -14,7 +14,7 @@
  *
  *   curl "https://data.solanatracker.io/v2/pnl/wallets/{wallet}" \
  *     -H "x-api-key: YOUR_API_KEY"
- *   -> { summary: { pnl: { total: number }, counts: {...} }, analysis: { winRate }, ... }
+ *   -> { summary: { pnl: { total: number }, invested, proceeds, roi: number, counts: {...} }, analysis: { winRate }, ... }
  *
  * Free tier: 10,000 requests/month, 3 req/sec — get a key at
  * https://www.solanatracker.io/account/data-api (requires signing up;
@@ -25,8 +25,20 @@ const SOLANA_TRACKER_API_BASE = "https://data.solanatracker.io";
 
 export class SolanaTrackerError extends Error {}
 
-/** Fetches a wallet's total PnL from Solana Tracker's wallet PnL summary. Throws on any failure. */
-export async function fetchWalletTotalPnl(walletAddress: string): Promise<number> {
+export interface WalletTotalPnlResult {
+  pnl: number;
+  /**
+   * The wallet's real all-time return-on-capital %, straight from Solana
+   * Tracker's own `summary.roi` field — null only if that specific field is
+   * missing from an otherwise-valid response, never estimated. See
+   * fetchWalletPeriodRealizedPnl()'s doc comment for why the timed-window
+   * endpoint below has no equivalent and can't offer this at all.
+   */
+  roiPercent: number | null;
+}
+
+/** Fetches a wallet's total PnL (and real ROI %, if present) from Solana Tracker's wallet PnL summary. Throws on any failure. */
+export async function fetchWalletTotalPnl(walletAddress: string): Promise<WalletTotalPnlResult> {
   const apiKey = process.env.SOLANA_TRACKER_API_KEY;
   if (!apiKey) {
     throw new SolanaTrackerError("SOLANA_TRACKER_API_KEY is not configured.");
@@ -53,12 +65,16 @@ export async function fetchWalletTotalPnl(walletAddress: string): Promise<number
 
   const data = await res.json().catch(() => null);
   const totalPnl = data?.summary?.pnl?.total;
+  const roi = data?.summary?.roi;
 
   if (typeof totalPnl !== "number" || Number.isNaN(totalPnl)) {
     throw new SolanaTrackerError("Solana Tracker response did not include a numeric total PnL.");
   }
 
-  return totalPnl;
+  return {
+    pnl: totalPnl,
+    roiPercent: typeof roi === "number" && !Number.isNaN(roi) ? roi : null,
+  };
 }
 
 /**

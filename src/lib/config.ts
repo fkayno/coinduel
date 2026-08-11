@@ -70,3 +70,8 @@ export const MAX_VIDEO_CONNECT_WAIT_SECONDS = 6;
 /** CoinDuel's community Discord invite — the single source of truth, used
  * only by the footer's Discord icon (src/components/footer.tsx). */
 export const DISCORD_INVITE_URL = "https://discord.gg/C2QTbkBzWS";
+
+/** CoinDuel's real, owned production domain — the single source of truth for
+ * absolute URLs (share links, OG images, CTAs). Not the Vercel *.vercel.app
+ * preview domain. */
+export const SITE_URL = "https://coinduel.online";

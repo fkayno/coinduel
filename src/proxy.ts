@@ -13,8 +13,22 @@ const PROTECTED_PREFIXES = [
 ];
 const AUTH_ONLY_PAGES = ["/login", "/signup"];
 
+/**
+ * Public match share card + its OG image (/matches/{id}/share, and the
+ * opengraph-image route colocated under it) are meant to be viewable by
+ * anyone with the link — including link-preview crawlers with no session
+ * cookie at all — so they're carved out of the otherwise-blanket
+ * "/matches" auth gate below.
+ */
+const PUBLIC_MATCH_SHARE_PATTERN = /^\/matches\/[^/]+\/share(\/.*)?$/;
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (PUBLIC_MATCH_SHARE_PATTERN.test(pathname)) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
   const isLoggedIn = session !== null;

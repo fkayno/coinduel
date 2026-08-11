@@ -59,6 +59,7 @@ function toRecord(p: MatchPlayerInput): MatchPlayerRecord {
     startingPnl: null,
     endingPnl: null,
     pnlChange: null,
+    pnlPercent: null,
     result: null,
     topToken: null,
   };
@@ -118,11 +119,11 @@ async function ensurePnlFetched(match: StoredMatch): Promise<StoredMatch> {
   try {
     const players = (await Promise.all(
       match.players.map(async (p) => {
-        const [startingPnl, topToken] = await Promise.all([
+        const [{ pnl: startingPnl, pnlPercent }, topToken] = await Promise.all([
           provider.getFixedPnl(p.walletAddress ?? "", p.pnlSeed, match.gameMode),
           getTopToken(p.walletAddress ?? "", p.pnlSeed),
         ]);
-        return { ...p, startingPnl, topToken };
+        return { ...p, startingPnl, pnlPercent, topToken };
       })
     )) as [MatchPlayerRecord, MatchPlayerRecord];
 
