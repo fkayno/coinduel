@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { TextField } from "@/components/ui/text-field";
 import { loginAction } from "@/lib/auth/actions";
+import { ResetPasswordButton } from "@/components/auth/reset-password-modal";
 
 export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }) {
   const router = useRouter();
@@ -66,12 +66,7 @@ export function LoginForm({ redirectTo = "/dashboard" }: { redirectTo?: string }
         {isSubmitting ? "LOGGING IN..." : "LOGIN"}
       </button>
 
-      <Link
-        href="/forgot-password"
-        className="text-center text-xs font-semibold text-muted transition-colors duration-150 hover:text-foreground"
-      >
-        Forgot password?
-      </Link>
+      <ResetPasswordButton />
     </form>
   );
 }
